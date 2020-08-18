@@ -1338,39 +1338,71 @@ float mc_interface_temp_motor_filtered(void) {
 float mc_interface_get_battery_level(float *wh_left) {
 	const volatile mc_configuration *conf = mc_interface_get_configuration();
 	const float v_in = GET_INPUT_VOLTAGE();
+	const float ah_left = 0;
+	const float last_mc_ah = 0.0;
+	float v_in_ah_left = 0;
+	float battery_min_voltage = 0.0;
 	float battery_avg_voltage = 0.0;
 	float battery_avg_voltage_left = 0.0;
-	float ah_left = 0;
+	
 	float ah_tot = conf->si_battery_ah;
-
+	
 	switch (conf->si_battery_type) {
 	case BATTERY_TYPE_LIION_3_0__4_2:
 		battery_avg_voltage = ((3.2 + 4.2) / 2.0) * (float)(conf->si_battery_cells);
-		battery_avg_voltage_left = ((3.2 * (float)(conf->si_battery_cells) + v_in) / 2.0);
+		battery_min_voltage = 3.2 * (float)(conf->si_battery_cells;
+		battery_avg_voltage_left = (battery_min_voltage + v_in) / 2.0);
+
 		float batt_left = utils_map(v_in / (float)(conf->si_battery_cells),
 									3.2, 4.2, 0.0, 1.0);
 		batt_left = utils_batt_liion_norm_v_to_capacity(batt_left);
+
 		ah_tot *= 0.85; // 0.85 because the battery is not fully depleted at 3.2V / cell
-		ah_left = batt_left * ah_tot;
+		v_in_ah_left = batt_left * ah_tot;
 		break;
 
 	case BATTERY_TYPE_LIIRON_2_6__3_6:
 		battery_avg_voltage = ((2.8 + 3.6) / 2.0) * (float)(conf->si_battery_cells);
-		battery_avg_voltage_left = ((2.8 * (float)(conf->si_battery_cells) + v_in) / 2.0);
-		ah_left = utils_map(v_in / (float)(conf->si_battery_cells),
+		battery_min_voltage = 2.8 * (float)(conf->si_battery_cells;
+		battery_avg_voltage_left = (battery_min_voltage + v_in) / 2.0);
+		v_in_ah_left = utils_map(v_in / (float)(conf->si_battery_cells),
 				2.6, 3.6, 0.0, conf->si_battery_ah);
 		break;
 
 	case BATTERY_TYPE_LEAD_ACID:
 		// TODO: This does not really work for lead-acid batteries
 		battery_avg_voltage = ((2.1 + 2.36) / 2.0) * (float)(conf->si_battery_cells);
-		battery_avg_voltage_left = ((2.1 * (float)(conf->si_battery_cells) + v_in) / 2.0);
-		ah_left = utils_map(v_in / (float)(conf->si_battery_cells),
+		battery_min_voltage = 2.1 * (float)(conf->si_battery_cells;
+		battery_avg_voltage_left = (battery_min_voltage + v_in) / 2.0);
+		v_in_ah_left = utils_map(v_in / (float)(conf->si_battery_cells),
 				2.1, 2.36, 0.0, conf->si_battery_ah);
 		break;
 
 	default:
 		break;
+	}
+
+	if (conf->si_battery_level_high_load_v_drop_correction) {
+		/** 
+		 * running on high current will drop the v_in,
+		 * so the calculated ah_left is wrong while running, correct this behavior 
+		 * by calculating used ah with previous readings
+		 **/
+		switch (mc_interface_get_state()) {
+			case MC_STATE_RUNNING: {
+				float mc_ah = mc_interface_get_amp_hours();
+				ah_left = ah_left - ((mc_ah - last_mc_ah) / ah_tot);
+				last_mc_ah = mc_ah;
+			} break;
+			case MC_STATE_OFF: {
+				ah_left = v_in_ah_left;
+				last_mc_ah = mc_interface_get_amp_hours();
+			} break;
+			default:
+				break;
+		}
+	} else {
+		ah_left = v_in_ah_left;
 	}
 
 	const float wh_batt_tot = ah_tot * battery_avg_voltage;

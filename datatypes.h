@@ -355,6 +355,7 @@ typedef struct {
 	BATTERY_TYPE si_battery_type;
 	int si_battery_cells;
 	float si_battery_ah;
+	bool si_battery_level_high_load_v_drop_correction;
 } mc_configuration;
 
 // Applications to use

@@ -1129,6 +1129,10 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		}
 		break;
 
+	case COMM_RESET_METRICS: {
+		mc_interface_reset_metrics();
+	} break;
+
 	default:
 		break;
 	}

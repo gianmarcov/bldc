@@ -956,6 +956,18 @@ float mc_interface_get_watt_hours_charged(bool reset) {
 	return val;
 }
 
+void mc_interface_reset_metrics() {
+	if (mc_interface_get_state() == MC_STATE_OFF) {
+		motor_now()->m_amp_seconds = 0.0;
+		motor_now()->m_amp_seconds_charged = 0.0;
+		motor_now()->m_watt_seconds = 0.0;
+		motor_now()->m_watt_seconds_charged = 0.0;
+
+		mc_interface_get_tachometer_value(true);
+		mc_interface_get_tachometer_abs_value(true);
+	}
+}
+
 float mc_interface_get_tot_current(void) {
 	float ret = 0.0;
 
